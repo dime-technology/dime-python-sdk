@@ -74,6 +74,8 @@ returned as strings to avoid float rounding.
 | `dime.addresses`                | list, show, create, update, delete                                    |
 | `dime.deposits`                 | list, list_with_transactions, show                                    |
 | `dime.recurring_payments`       | list, show, create, edit, pause, cancel, activate, delete             |
+| `dime.invoices`                 | list, show, create, update, delete, send, mark_sent, void, duplicate, pay, get_link, list_items, add_line_item, update_line_item, delete_line_item, create_item |
+| `dime.recurring_invoices`       | list, show, create, cancel                                            |
 
 ### Transactions
 
@@ -164,6 +166,54 @@ dime.recurring_payments.activate('000010', rp.id)
 dime.recurring_payments.cancel('000010', rp.id)
 ```
 
+### Invoices
+
+```python
+invoice = dime.invoices.create('000010', {
+    'customer_uuid': customer.uuid,
+    'due_date': '2026-08-01 00:00:00',
+    'invoice_number': 'INV-1001',
+    'notes': 'Thanks for your business',
+})
+
+# Build up line items
+dime.invoices.add_line_item('000010', invoice.id, {
+    'description': 'Consulting',
+    'quantity': '2',
+    'amount': '75.00',
+})
+items = dime.invoices.list_items('000010', invoice.id)
+
+# Add a pre-configured catalog item
+dime.invoices.create_item('000010', invoice.id, item_id=99)
+
+# Send it, or just record that it went out
+dime.invoices.send('000010', invoice.id)
+dime.invoices.mark_sent('000010', invoice.id)
+
+# Share a hosted payment link
+link = dime.invoices.get_link('000010', invoice.id)
+print(link.link)
+
+# Record a (partial) payment, void, or duplicate
+dime.invoices.pay('000010', invoice.id, '50.00')
+dime.invoices.void('000010', invoice.id)
+dime.invoices.duplicate('000010', invoice.id)
+```
+
+### Recurring invoices
+
+```python
+ri = dime.recurring_invoices.create('000010', {
+    'customer_uuid': customer.uuid,
+    'frequency': 'Monthly',
+    'start_date': '2026-08-01 00:00:00',
+    'amount': '99.00',
+})
+
+dime.recurring_invoices.cancel('000010', ri.id)
+```
+
 ## Pagination
 
 List endpoints return a `CursorPage`. Iterate one page, walk pages manually, or stream every
@@ -227,7 +277,9 @@ except DimeException as e:
 ## Notes
 
 - **GET requests carry a JSON body.** The Dime API expects read parameters in the request body
-  even for `GET` endpoints; the SDK handles this transparently.
+  even for `GET` endpoints; the SDK handles this transparently. Point `base_url` at an `https://`
+  origin — an `http://` URL that 301-redirects to `https` will have its request body dropped by the
+  redirect, which surfaces as a `403` "You do not have access to this company." from the API.
 - **No API versioning.** Endpoints live under `/api` with no version prefix.
 
 ## Development
