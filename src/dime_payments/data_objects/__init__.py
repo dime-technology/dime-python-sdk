@@ -12,6 +12,11 @@ from .payment_method import PaymentMethod
 from .recurring_invoice import RecurringInvoice
 from .recurring_payment import RecurringPayment
 from .recurring_payment_method import RecurringPaymentMethod
+from .subscribe_result import SubscribeResult
+from .subscription import Subscription
+from .subscription_item import SubscriptionItem
+from .subscription_payment_method import SubscriptionPaymentMethod
+from .subscription_plan import SubscriptionPlan
 from .tokenize_result import TokenizeResult
 from .transaction import Transaction
 from .transaction_address import TransactionAddress
@@ -34,4 +39,9 @@ __all__ = [
     'Invoice',
     'LineItem',
     'RecurringInvoice',
+    'SubscriptionPlan',
+    'Subscription',
+    'SubscriptionItem',
+    'SubscriptionPaymentMethod',
+    'SubscribeResult',
 ]

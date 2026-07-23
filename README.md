@@ -76,6 +76,8 @@ returned as strings to avoid float rounding.
 | `dime.recurring_payments`       | list, show, create, edit, pause, cancel, activate, delete             |
 | `dime.invoices`                 | list, show, create, update, delete, send, mark_sent, void, duplicate, pay, get_link, list_items, add_line_item, update_line_item, delete_line_item, create_item |
 | `dime.recurring_invoices`       | list, show, create, cancel                                            |
+| `dime.subscription_plans`       | list, show, create, update, delete, publish, archive, unarchive, subscribe |
+| `dime.subscriptions`            | list, show, pause, resume, cancel                                     |
 
 ### Transactions
 
@@ -212,6 +214,64 @@ ri = dime.recurring_invoices.create('000010', {
 })
 
 dime.recurring_invoices.cancel('000010', ri.id)
+```
+
+### Subscription plans
+
+A subscription plan is a reusable recurring offering customers can subscribe to. Plans are
+created as a `draft` and must be published before anyone can subscribe.
+
+```python
+plan = dime.subscription_plans.create('000010', {
+    'name': 'Monthly Membership',
+    'description': 'Full access, billed monthly.',
+    'recurrence_schedule': 'Monthly',   # Weekly, Biweekly, FirstFifteenth, Monthly, Yearly
+    'allow_public': True,
+    'lines': [
+        {'item_id': 5, 'name': 'Base membership', 'quantity': 1, 'unit_price': 25},
+    ],
+})
+
+# Draft -> active so customers can subscribe
+dime.subscription_plans.publish('000010', plan.id)
+
+# Only active plans; filter by status (draft, active, archived)
+for p in dime.subscription_plans.list('000010', status='active'):
+    print(p.name, p.total)
+
+# Stop new subscriptions without deleting; bring it back to draft later
+dime.subscription_plans.archive('000010', plan.id)
+dime.subscription_plans.unarchive('000010', plan.id)
+
+# Enroll a customer against a saved payment method (charges the first payment)
+result = dime.subscription_plans.subscribe('000010', plan.id, customer.uuid, pm.id)
+print(result.subscription_id, result.status, result.transaction_number)
+
+# Plans with no subscribers can be deleted; otherwise archive instead
+dime.subscription_plans.delete('000010', plan.id)
+```
+
+### Subscriptions
+
+A subscription is a single customer's enrollment in a plan. Lifecycle transitions fire the
+matching `SUBSCRIPTION_*` webhook.
+
+```python
+# All of a customer's active subscriptions
+for sub in dime.subscriptions.list('000010', {
+    'status': 'Active',                 # Active, Failed, Paused, Cancelled, Ended
+    'customer_uuid': customer.uuid,
+}):
+    print(sub.id, sub.plan_name, sub.next_run_date)
+
+sub = dime.subscriptions.show('000010', 42)
+
+# Pause until a future date (omit the date to pause indefinitely), then resume
+dime.subscriptions.pause('000010', sub.id, '2026-09-01')
+dime.subscriptions.resume('000010', sub.id)
+
+# Permanently cancel — no further charges
+dime.subscriptions.cancel('000010', sub.id)
 ```
 
 ## Pagination

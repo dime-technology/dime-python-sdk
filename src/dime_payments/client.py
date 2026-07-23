@@ -8,6 +8,8 @@ from .resources.merchants import Merchants
 from .resources.payment_methods import PaymentMethods
 from .resources.recurring_invoices import RecurringInvoices
 from .resources.recurring_payments import RecurringPayments
+from .resources.subscription_plans import SubscriptionPlans
+from .resources.subscriptions import Subscriptions
 from .resources.transactions import Transactions
 
 
@@ -29,6 +31,8 @@ class Client:
         self.recurring_payments = RecurringPayments(transport)
         self.invoices = Invoices(transport)
         self.recurring_invoices = RecurringInvoices(transport)
+        self.subscription_plans = SubscriptionPlans(transport)
+        self.subscriptions = Subscriptions(transport)
 
     def config(self) -> Config:
         return self._config
