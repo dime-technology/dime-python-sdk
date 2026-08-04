@@ -1,0 +1,62 @@
+name: Publish
+
+# Publishing is driven by GitHub Releases: tag, write the release notes, hit
+# publish, and this ships the tag to PyPI. workflow_dispatch is the escape hatch
+# for republishing a tag whose release already exists — select the tag as the
+# ref when dispatching.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write # required for PyPI trusted publishing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # The SDK carries its version in three places and they drift silently.
+      # v1.0.0 sat on PyPI for ten weeks while main had moved on, so fail loudly
+      # rather than publish a package that misreports itself in X-Dime-Sdk.
+      - name: Verify the tag matches every declared version
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          tag="${TAG_NAME#v}"
+          proj=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          cfg=$(python -c "import re; print(re.search(r\"VERSION = '([^']+)'\", open('src/dime_payments/config.py').read()).group(1))")
+          trn=$(python -c "import re; print(re.search(r\"SDK_VERSION = '([^']+)'\", open('src/dime_payments/http/transport.py').read()).group(1))")
+          echo "tag=$tag  pyproject.toml=$proj  config.py=$cfg  transport.py=$trn"
+          [ "$tag" = "$proj" ] || { echo "::error::pyproject.toml ($proj) does not match tag ($tag)"; exit 1; }
+          [ "$tag" = "$cfg" ]  || { echo "::error::config.py ($cfg) does not match tag ($tag)"; exit 1; }
+          [ "$tag" = "$trn" ]  || { echo "::error::transport.py ($trn) does not match tag ($tag)"; exit 1; }
+
+      - name: Install and test
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pytest
+
+      - name: Build distributions
+        run: |
+          pip install build
+          python -m build
+
+      # Trusted publishing — authenticates via OIDC, so there is no PyPI token
+      # to store or rotate. Requires a trusted publisher configured on PyPI for
+      # this repo, this workflow filename, and the "pypi" environment.
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
