@@ -1,55 +1,62 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..support.arr import arr_int, arr_string
+from ..support.arr import arr_array, arr_bool, arr_int, arr_object, arr_string
+from .invoice_customer import InvoiceCustomer
+from .invoice_event import InvoiceEvent
+from .invoice_payment import InvoicePayment
 from .line_item import LineItem
 
 
 @dataclass
 class Invoice:
+    """
+    A full invoice as returned by the show, create, update and action endpoints.
+
+    Money fields arrive as dollar amounts and are kept as strings, consistent
+    with the rest of the SDK, to avoid float rounding.
+    """
+
     id: int | None = None
-    sid: str | None = None
+    token: str | None = None
     invoice_number: str | None = None
-    customer_uuid: str | None = None
     status: str | None = None
+    payment_terms: str | None = None
+    issue_date: str | None = None
     due_date: str | None = None
-    notes: str | None = None
+    is_overdue: bool = False
     subtotal: str | None = None
     total: str | None = None
     amount_paid: str | None = None
-    amount_due: str | None = None
-    link: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
-    sent_at: str | None = None
-    paid_at: str | None = None
-    voided_at: str | None = None
-    line_items: list[LineItem] = field(default_factory=list)
+    balance: str | None = None
+    allow_partial_payment: bool = False
+    thank_you_note: str | None = None
+    public_url: str | None = None
+    customer: InvoiceCustomer = field(default_factory=InvoiceCustomer)
+    items: list[LineItem] = field(default_factory=list)
+    payments: list[InvoicePayment] = field(default_factory=list)
+    events: list[InvoiceEvent] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> 'Invoice':
-        raw_items = data.get('line_items', [])
-        if isinstance(raw_items, dict):
-            raw_items = list(raw_items.values())
-        line_items = [LineItem.from_dict(i) for i in raw_items if isinstance(i, dict)]
-
         return cls(
             id=arr_int(data, 'id'),
-            sid=arr_string(data, 'sid'),
+            token=arr_string(data, 'token'),
             invoice_number=arr_string(data, 'invoice_number'),
-            customer_uuid=arr_string(data, 'customer_uuid'),
             status=arr_string(data, 'status'),
+            payment_terms=arr_string(data, 'payment_terms'),
+            issue_date=arr_string(data, 'issue_date'),
             due_date=arr_string(data, 'due_date'),
-            notes=arr_string(data, 'notes'),
+            is_overdue=arr_bool(data, 'is_overdue'),
             subtotal=arr_string(data, 'subtotal'),
             total=arr_string(data, 'total'),
             amount_paid=arr_string(data, 'amount_paid'),
-            amount_due=arr_string(data, 'amount_due'),
-            link=arr_string(data, 'link'),
-            created_at=arr_string(data, 'created_at'),
-            updated_at=arr_string(data, 'updated_at'),
-            sent_at=arr_string(data, 'sent_at'),
-            paid_at=arr_string(data, 'paid_at'),
-            voided_at=arr_string(data, 'voided_at'),
-            line_items=line_items,
+            balance=arr_string(data, 'balance'),
+            allow_partial_payment=arr_bool(data, 'allow_partial_payment'),
+            thank_you_note=arr_string(data, 'thank_you_note'),
+            public_url=arr_string(data, 'public_url'),
+            customer=InvoiceCustomer.from_dict(arr_object(data, 'customer')),
+            items=[LineItem.from_dict(i) for i in arr_array(data, 'items') if isinstance(i, dict)],
+            payments=[InvoicePayment.from_dict(p) for p in arr_array(data, 'payments') if isinstance(p, dict)],
+            events=[InvoiceEvent.from_dict(e) for e in arr_array(data, 'events') if isinstance(e, dict)],
         )

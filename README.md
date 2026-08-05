@@ -168,48 +168,77 @@ dime.recurring_payments.cancel('000010', rp.id)
 
 ### Invoices
 
+Invoices are scoped to a merchant `sid` and built from line items that each reference a merchant
+item (a fund or designation). Draft invoices can be edited; once sent they are locked.
+
+Identify the customer with `customer_uuid` — the same uuid every other resource uses, and the only
+identifier the customer endpoints return. `customer_id` is still accepted for older integrations.
+
 ```python
+# Look up (or create) the merchant items a line can reference
+items = dime.invoices.list_items('000010')
+item = dime.invoices.create_item('000010', {
+    'name': 'Consulting',
+    'description': 'Professional services',
+    'price': 125,
+    'tax_deductible': False,
+})
+
+# Create a draft invoice with one or more line items
 invoice = dime.invoices.create('000010', {
     'customer_uuid': customer.uuid,
-    'due_date': '2026-08-01 00:00:00',
-    'invoice_number': 'INV-1001',
-    'notes': 'Thanks for your business',
+    'customer_name': 'Jane Doe',
+    'customer_email': 'jane@example.com',
+    'payment_terms': 'net_15',  # due_on_receipt | net_15 | net_30 | net_60
+    'lines': [
+        {'item_id': item.id, 'name': 'Consulting', 'description': '2 hours',
+         'quantity': 2, 'unit_price': 125},
+    ],
 })
 
-# Build up line items
-dime.invoices.add_line_item('000010', invoice.id, {
-    'description': 'Consulting',
-    'quantity': '2',
-    'amount': '75.00',
+# Line-item edits return the refreshed invoice, with totals recalculated
+invoice = dime.invoices.add_line_item('000010', invoice.id, {
+    'item_id': item.id, 'name': 'Setup', 'quantity': 1, 'unit_price': 50,
 })
-items = dime.invoices.list_items('000010', invoice.id)
+invoice = dime.invoices.update_line_item('000010', invoice.id, invoice.items[0].id, {'quantity': 3})
+invoice = dime.invoices.delete_line_item('000010', invoice.id, invoice.items[0].id)
 
-# Add a pre-configured catalog item
-dime.invoices.create_item('000010', invoice.id, item_id=99)
-
-# Send it, or just record that it went out
+# Email it to the customer, or activate the pay link without emailing
 dime.invoices.send('000010', invoice.id)
 dime.invoices.mark_sent('000010', invoice.id)
 
-# Share a hosted payment link
+# Share the public pay link
 link = dime.invoices.get_link('000010', invoice.id)
-print(link.link)
+print(link.public_url)
 
-# Record a (partial) payment, void, or duplicate
-dime.invoices.pay('000010', invoice.id, '50.00')
+# Take a merchant-initiated payment. payment_type is required; omit amount to
+# pay the full balance.
+dime.invoices.pay('000010', invoice.id, {
+    'payment_type': 'cc',  # cc | ach
+    'token': pm.token,
+    'amount': 125,
+})
+
 dime.invoices.void('000010', invoice.id)
 dime.invoices.duplicate('000010', invoice.id)
 ```
 
 ### Recurring invoices
 
+Templates that emit an invoice on a schedule.
+
 ```python
 ri = dime.recurring_invoices.create('000010', {
     'customer_uuid': customer.uuid,
-    'frequency': 'Monthly',
-    'start_date': '2026-08-01 00:00:00',
-    'amount': '99.00',
+    'payment_terms': 'net_30',
+    'recurring_frequency': 'Monthly',  # Weekly | Biweekly | FirstFifteenth | Monthly | Yearly
+    'recurring_start_date': '2026-09-01',
+    'lines': [
+        {'item_id': item.id, 'name': 'Retainer', 'quantity': 1, 'unit_price': 500},
+    ],
 })
+
+print(ri.next_run_date, ri.upcoming_run_dates)
 
 dime.recurring_invoices.cancel('000010', ri.id)
 ```
