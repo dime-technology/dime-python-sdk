@@ -18,6 +18,13 @@ class RecurringInvoices(AbstractResource):
         return RecurringInvoice.from_dict(raw.get('data') or {})
 
     def create(self, sid: str, attributes: dict[str, Any]) -> RecurringInvoice:
+        """
+        Create a recurring-invoice template. When ``recurring_start_date`` is today
+        the first invoice is generated and sent immediately.
+
+        ``cover_fee_required`` makes the customer cover the processing fee on every
+        invoice this template generates.
+        """
         body = self._envelope({'sid': sid} | attributes)
         raw = self._transport.request('POST', 'recurring-invoice/create', body)
         return RecurringInvoice.from_dict(raw.get('data') or {})
