@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..support.arr import arr_array, arr_bool, arr_int, arr_object, arr_string
+from .cover_fee_quote import CoverFeeQuote
 from .invoice_customer import InvoiceCustomer
 from .invoice_event import InvoiceEvent
 from .invoice_payment import InvoicePayment
@@ -15,6 +16,10 @@ class Invoice:
 
     Money fields arrive as dollar amounts and are kept as strings, consistent
     with the rest of the SDK, to avoid float rounding.
+
+    When ``cover_fee_required`` is set the customer must also pay the processing
+    fee, which is reported on :attr:`cover_fee_quote` rather than included in
+    ``total`` — so what settles is more than what the invoice says.
     """
 
     id: int | None = None
@@ -30,6 +35,8 @@ class Invoice:
     amount_paid: str | None = None
     balance: str | None = None
     allow_partial_payment: bool = False
+    cover_fee_required: bool = False
+    cover_fee_quote: CoverFeeQuote | None = None
     thank_you_note: str | None = None
     public_url: str | None = None
     customer: InvoiceCustomer = field(default_factory=InvoiceCustomer)
@@ -53,6 +60,12 @@ class Invoice:
             amount_paid=arr_string(data, 'amount_paid'),
             balance=arr_string(data, 'balance'),
             allow_partial_payment=arr_bool(data, 'allow_partial_payment'),
+            cover_fee_required=arr_bool(data, 'cover_fee_required'),
+            cover_fee_quote=(
+                CoverFeeQuote.from_dict(data['cover_fee_quote'])
+                if isinstance(data.get('cover_fee_quote'), dict)
+                else None
+            ),
             thank_you_note=arr_string(data, 'thank_you_note'),
             public_url=arr_string(data, 'public_url'),
             customer=InvoiceCustomer.from_dict(arr_object(data, 'customer')),

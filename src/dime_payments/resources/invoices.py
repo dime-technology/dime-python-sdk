@@ -39,6 +39,12 @@ class Invoices(AbstractResource):
         ``customer_name``, ``customer_email``, ``payment_terms``
         (``due_on_receipt`` | ``net_15`` | ``net_30`` | ``net_60``) and at least
         one entry in ``lines``, each referencing a Merchant ``item_id``.
+
+        Pass ``cover_fee_required`` to make the customer pay the processing fee. The
+        fee is added on top of the invoice at payment time rather than becoming a
+        line item, so ``total`` stays the amount owed to the merchant — read
+        :attr:`Invoice.cover_fee_quote` for what the customer will actually be
+        charged. Omit it to inherit the Merchant's invoice setting.
         """
         body = self._envelope({'sid': sid} | attributes)
         raw = self._transport.request('POST', 'invoice/create', body)
@@ -86,6 +92,12 @@ class Invoices(AbstractResource):
         ``expiration_date``; for ACH, pass ``routing_number`` /
         ``account_number`` / ``account_type`` / ``account_name``. Omit ``amount``
         to pay the full balance.
+
+        On a cover-fee invoice the processing fee for ``payment_type`` is charged on
+        top of ``amount``, so the card or bank account is debited more than the
+        invoice is credited. The fee lands as ``cover_fee`` on the matching entry in
+        :attr:`Invoice.payments`. Card and ACH rates differ, so the same ``amount``
+        settles differently per ``payment_type``.
         """
         body = self._envelope({'sid': sid, 'invoice_id': invoice_id} | attributes)
         raw = self._transport.request('POST', 'invoice/pay', body)

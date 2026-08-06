@@ -254,3 +254,105 @@ def test_delete_line_item_sends_both_ids_and_returns_invoice():
     assert data['invoice_id'] == 7
     assert data['line_item_id'] == 1
     assert invoice.id == 7
+
+
+# --- Required cover fees -----------------------------------------------------
+#
+# The fee is quoted per payment method against the balance and is deliberately
+# absent from `total`, which stays the amount owed to the merchant.
+
+COVER_FEE_BODY = {
+    **INVOICE_BODY,
+    'subtotal': 100.0,
+    'total': 100.0,
+    'balance': 100.0,
+    'cover_fee_required': True,
+    'cover_fee_quote': {
+        'basis': 'balance',
+        'base': 100.0,
+        'cc': {'fee': 4.32, 'total': 104.32},
+        'ach': {'fee': 1.26, 'total': 101.26},
+    },
+    'payments': [
+        {
+            'amount': 100.0,
+            'cover_fee': 4.32,
+            'paid_at': '2026-08-06T10:00:00+00:00',
+            'method': '+CC',
+            'transaction_id': 91,
+        },
+    ],
+}
+
+
+def test_create_sends_cover_fee_required():
+    client, mock = fake_client([{'status': 201, 'body': {'data': INVOICE_BODY}}])
+    client.invoices.create(
+        '000010',
+        {
+            'customer_uuid': 'cus-uuid',
+            'customer_name': 'Jane Doe',
+            'customer_email': 'jane@example.com',
+            'payment_terms': 'net_15',
+            'cover_fee_required': True,
+            'lines': [{'item_id': 5, 'name': 'Consulting', 'quantity': 1, 'unit_price': 100}],
+        },
+    )
+    assert sent_body(mock)['data']['cover_fee_required'] is True
+
+
+def test_recurring_create_sends_cover_fee_required():
+    client, mock = fake_client([{'status': 201, 'body': {'data': {'id': 3, 'status': 'Active'}}}])
+    client.recurring_invoices.create(
+        '000010',
+        {
+            'customer_uuid': 'cus-uuid',
+            'payment_terms': 'net_30',
+            'cover_fee_required': True,
+            'recurring_frequency': 'Monthly',
+            'recurring_start_date': '2026-09-01',
+            'lines': [{'item_id': 5, 'name': 'Retainer', 'quantity': 1, 'unit_price': 500}],
+        },
+    )
+    assert sent_body(mock)['data']['cover_fee_required'] is True
+
+
+def test_show_parses_the_per_method_quote_and_keeps_it_out_of_total():
+    client, _ = fake_client([{'status': 200, 'body': {'data': COVER_FEE_BODY}}])
+    invoice = client.invoices.show('000010', 7)
+
+    assert invoice.cover_fee_required is True
+    assert invoice.cover_fee_quote is not None
+    assert invoice.cover_fee_quote.basis == 'balance'
+    assert invoice.cover_fee_quote.cc_fee == '4.32'
+    assert invoice.cover_fee_quote.cc_total == '104.32'
+    assert invoice.cover_fee_quote.ach_fee == '1.26'
+    assert invoice.cover_fee_quote.ach_total == '101.26'
+    # The merchant is still owed the invoice amount; the fee sits on top of it.
+    assert invoice.total == '100.0'
+
+
+def test_payment_reports_the_fee_charged_alongside_the_amount_credited():
+    client, _ = fake_client([{'status': 200, 'body': {'data': COVER_FEE_BODY}}])
+    payment = client.invoices.show('000010', 7).payments[0]
+
+    # amount + cover_fee is what the customer was actually charged.
+    assert payment.amount == '100.0'
+    assert payment.cover_fee == '4.32'
+
+
+def test_quote_is_none_when_no_fee_is_required():
+    client, _ = fake_client([invoice_response()])
+    invoice = client.invoices.show('000010', 7)
+
+    assert invoice.cover_fee_required is False
+    assert invoice.cover_fee_quote is None
+
+
+def test_list_reads_the_cover_fee_flag():
+    client, _ = fake_client(
+        [{'status': 200, 'body': {'data': [{**INVOICE_BODY, 'cover_fee_required': True}], 'meta': {}}}]
+    )
+    page = client.invoices.list('000010')
+
+    assert page.data[0].cover_fee_required is True

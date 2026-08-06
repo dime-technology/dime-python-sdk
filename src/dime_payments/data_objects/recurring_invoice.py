@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..support.arr import arr_array, arr_int, arr_object, arr_string
+from ..support.arr import arr_array, arr_bool, arr_int, arr_object, arr_string
 from .invoice_customer import InvoiceCustomer
 from .line_item import LineItem
 
@@ -38,6 +38,8 @@ class RecurringInvoice:
     status: str | None = None
     recurrence_schedule: str | None = None
     payment_terms: str | None = None
+    # Copied onto every invoice this template generates.
+    cover_fee_required: bool = False
     start_date: str | None = None
     end_date: str | None = None
     next_run_date: str | None = None
@@ -55,6 +57,7 @@ class RecurringInvoice:
             status=arr_string(data, 'status'),
             recurrence_schedule=arr_string(data, 'recurrence_schedule'),
             payment_terms=arr_string(data, 'payment_terms'),
+            cover_fee_required=arr_bool(data, 'cover_fee_required'),
             start_date=arr_string(data, 'start_date'),
             end_date=arr_string(data, 'end_date'),
             next_run_date=arr_string(data, 'next_run_date'),
