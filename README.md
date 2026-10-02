@@ -174,6 +174,11 @@ item (a fund or designation). Draft invoices can be edited; once sent they are l
 Identify the customer with `customer_uuid` — the same uuid every other resource uses, and the only
 identifier the customer endpoints return. `customer_id` is still accepted for older integrations.
 
+**Statuses.** `invoice.status` is one of `draft`, `sent`, `viewed`, `partially_paid`, `paid`, `void` or
+`refunded`. `paid` is not always final: if the customer's bank returns an ACH payment, the invoice is
+reopened (back to `partially_paid`, `viewed` or `sent`, with `amount_paid` and `balance` updated) and an
+`invoice_payment_returned` webhook fires. Re-read the invoice rather than caching a `paid` status forever.
+
 ```python
 # Look up (or create) the merchant items a line can reference
 items = dime.invoices.list_items('000010')

@@ -25,6 +25,12 @@ class Invoices(AbstractResource):
     """
 
     def list(self, sid: str, filters: dict[str, Any] | None = None) -> CursorPage[Invoice]:
+        """
+        List invoices for a merchant.
+
+        ``filters['status']`` is one of draft, sent, viewed, partially_paid, paid, void,
+        refunded, overdue or all.
+        """
         body = self._envelope({'sid': sid}, filters or {})
         return self._paginate('GET', 'invoices', body, Invoice.from_dict)
 
