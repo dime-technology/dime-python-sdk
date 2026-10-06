@@ -376,16 +376,17 @@ result = dime.funds.release(
     transaction_info_ids=[t.transaction_info_id for t in payable.transactions],
 )
 
-print(result.release.status)  # released | unknown
+print(result.release.status)  # released | failed | unknown
 ```
 
 Use a fresh `idempotency_key` for every intended release and reuse it when retrying: a repeat
 returns the original release (`result.replayed`) instead of sending money twice. `unknown` means no
 confirmation came back and it may have gone through; its amount stays out of `releasable` until it
-is reconciled, so a later release cannot pay it twice. A declined
-release raises `ValidationException`, with the failed record under
-`e.get_response_body()['data']['release']`; a reused key or a release already in flight raises
-`ApiException` (409).
+is reconciled, so a later release cannot pay it twice. A release the processor declines is returned
+with status `failed` and a `failure_reason`; nothing moved. A request refused before anything was
+recorded raises: `ValidationException` (422) for more than is releasable or an ineligible payment,
+`ApiException` (409) for a reused key or a release already in flight, and `ServerException` (503)
+when the processor cannot be reached.
 
 ### Subscription plans and subscriptions
 

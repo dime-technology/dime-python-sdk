@@ -1,5 +1,5 @@
 import pytest
-from dime_payments import ApiException, ValidationException
+from dime_payments import ApiException, ServerException, ValidationException
 from tests.helpers import fake_client, sent_body
 
 BALANCE_BODY = {
@@ -116,12 +116,50 @@ def test_release_unconfirmed_returns_unknown_status():
     assert result.release.failure_reason == 'No confirmation from the processor.'
 
 
-def test_release_declined_raises_with_failed_release_in_body():
+def test_release_declined_returns_failed_release():
     release = RELEASE_BODY['release'] | {'status': 'failed', 'failure_reason': 'Insufficient funds'}
     client, _ = fake_client([{'status': 422, 'body': {'data': RELEASE_BODY | {'release': release}}}])
+    result = client.funds.release('91828382', 'payout-4', amount=10)
+    assert result.release.status == 'failed'
+    assert result.release.failure_reason == 'Insufficient funds'
+    assert result.replayed is False
+
+
+def test_release_over_releasable_raises():
+    client, _ = fake_client([{'status': 422, 'body': {'data': {
+        'message': 'That is more than is releasable. Up to $5,172.72 can be released right now.',
+        'releasable': 5172.72,
+    }}}])
     with pytest.raises(ValidationException) as exc_info:
-        client.funds.release('91828382', 'payout-4', amount=10)
-    assert exc_info.value.get_response_body()['data']['release']['status'] == 'failed'
+        client.funds.release('91828382', 'payout-6', amount=99999)
+    assert exc_info.value.get_response_body()['data']['releasable'] == 5172.72
+
+
+def test_release_ineligible_transactions_raises():
+    client, _ = fake_client([{'status': 422, 'body': {'data': {
+        'message': 'One of those transactions cannot be released. Nothing was released.',
+        'ineligible': [{'transaction_info_id': '1297455', 'reason': 'ACH payments are held for 7 days.'}],
+    }}}])
+    with pytest.raises(ValidationException) as exc_info:
+        client.funds.release('91828382', 'payout-7', transaction_info_ids=['1297455'])
+    assert str(exc_info.value) == 'One of those transactions cannot be released. Nothing was released.'
+
+
+def test_release_validation_error_raises():
+    client, _ = fake_client([{'status': 400, 'body': {'errors': {
+        'data.idempotency_key': ['The data.idempotency key field is required.'],
+    }}}])
+    with pytest.raises(ValidationException):
+        client.funds.release('91828382', '', amount=10)
+
+
+def test_release_processor_unreachable_raises():
+    unreachable = {'status': 503, 'body': {'data': {
+        'message': 'The processor could not be reached. Nothing was released; try again shortly.',
+    }}}
+    client, _ = fake_client([unreachable, unreachable, unreachable])
+    with pytest.raises(ServerException):
+        client.funds.release('91828382', 'payout-8', amount=10)
 
 
 def test_release_key_conflict_raises_api_exception_with_message():
