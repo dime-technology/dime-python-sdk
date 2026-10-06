@@ -32,11 +32,11 @@ class ErrorHandler:
             message = body.get('message')
             if isinstance(message, dict):
                 raise ValidationException('Validation failed', status_code=status, response_body=body, errors=message)
-            msg = message if isinstance(message, str) else f'Validation failed ({status})'
+            msg = ErrorHandler._message(body) or f'Validation failed ({status})'
             raise ValidationException(msg, status_code=status, response_body=body)
 
         if status == 401:
-            msg = body.get('message', 'Unauthenticated')
+            msg = ErrorHandler._message(body) or 'Unauthenticated'
             raise AuthenticationException(str(msg), status_code=status, response_body=body)
 
         if status == 403:
@@ -65,12 +65,25 @@ class ErrorHandler:
                     retry_after = float(retry_after_hdr)
                 except (ValueError, TypeError):
                     pass
-            msg = body.get('message', 'Too many requests')
+            msg = ErrorHandler._message(body) or 'Too many requests'
             raise RateLimitException(str(msg), status_code=status, response_body=body, retry_after=retry_after)
 
         if status >= 500:
-            msg = body.get('message', 'Server error')
+            msg = ErrorHandler._message(body) or 'Server error'
             raise ServerException(str(msg), status_code=status, response_body=body)
 
-        msg = body.get('message', f'HTTP {status}')
+        msg = ErrorHandler._message(body) or f'HTTP {status}'
         raise ApiException(str(msg), status_code=status, response_body=body)
+
+    @staticmethod
+    def _message(body: dict[str, Any]) -> str | None:
+        """The API's error message, which it sends either at the top level or under ``data``."""
+        message = body.get('message')
+        if isinstance(message, str) and message:
+            return message
+        data_section = body.get('data')
+        if isinstance(data_section, dict):
+            nested = data_section.get('message')
+            if isinstance(nested, str) and nested:
+                return nested
+        return None

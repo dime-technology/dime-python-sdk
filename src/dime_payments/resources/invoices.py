@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from typing import Any
 
 from ..data_objects.invoice import Invoice
@@ -114,7 +115,7 @@ class Invoices(AbstractResource):
         raw = self._transport.request('GET', 'invoice/link', body)
         return InvoiceLink.from_dict(raw.get('data') or {})
 
-    def list_items(self, sid: str) -> list[InvoiceItem]:
+    def list_items(self, sid: str) -> builtins.list[InvoiceItem]:
         """
         List the Merchant's items (funds/designations) that line items can
         reference. Scoped to the merchant, not to a single invoice — an

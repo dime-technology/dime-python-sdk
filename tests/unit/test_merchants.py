@@ -49,3 +49,36 @@ def test_get_form_link():
     client, _ = fake_client([{'status': 200, 'body': {'data': {'link': 'https://app.dimepayments.com/onboard/abc'}}}])
     result = client.merchants.get_form_link('000010')
     assert result.link == 'https://app.dimepayments.com/onboard/abc'
+
+
+def test_application_status_maps_response():
+    client, mock = fake_client([{'status': 200, 'body': {'data': {
+        'sid': '00069',
+        'name': 'Acme Inc',
+        'status': 'underwriting',
+        'application_status': 'needs_documents',
+        'boarded': False,
+        'application_submitted_at': '2024-01-15T14:02:11+00:00',
+    }}}])
+    result = client.merchants.application_status('00069')
+    assert result.status == 'underwriting'
+    assert result.application_status == 'needs_documents'
+    assert result.boarded is False
+    assert result.application_submitted_at == '2024-01-15T14:02:11+00:00'
+    assert sent_body(mock) == {'data': {'sid': '00069'}}
+    assert mock.request.call_args.args[0] == 'GET'
+    assert mock.request.call_args.args[1].endswith('merchant/application-status')
+
+
+def test_application_status_before_onboarding_starts():
+    client, _ = fake_client([{'status': 200, 'body': {'data': {
+        'sid': '00069',
+        'name': 'Acme Inc',
+        'status': 'lead',
+        'application_status': None,
+        'boarded': False,
+        'application_submitted_at': None,
+    }}}])
+    result = client.merchants.application_status('00069')
+    assert result.application_status is None
+    assert result.application_submitted_at is None

@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 class Config:
     DEFAULT_BASE_URL = 'https://app.dimepayments.com'
-    VERSION = '1.3.1'
+    VERSION = '1.4.0'
 
     def __init__(
         self,
