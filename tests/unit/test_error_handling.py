@@ -102,3 +102,24 @@ def test_connection_exception_when_request_fails():
 
     with pytest.raises(ConnectionException):
         client.transactions.list('000010')
+
+
+def test_message_nested_under_data_is_used():
+    client, _ = fake_client([{'status': 401, 'body': {'data': {'message': 'Permission Denied.'}}}])
+    with pytest.raises(AuthenticationException) as exc_info:
+        client.transactions.list('000010')
+    assert str(exc_info.value) == 'Permission Denied.'
+
+
+def test_api_exception_message_nested_under_data():
+    client, _ = fake_client([{'status': 409, 'body': {'data': {'message': 'Conflict'}}}])
+    with pytest.raises(ApiException) as exc_info:
+        client.transactions.list('000010')
+    assert str(exc_info.value) == 'Conflict'
+
+
+def test_validation_exception_falls_back_to_status_without_a_message():
+    client, _ = fake_client([{'status': 422, 'body': {'data': {'status_code': '05'}}}])
+    with pytest.raises(ValidationException) as exc_info:
+        client.transactions.charge_card('000010', {})
+    assert str(exc_info.value) == 'Validation failed (422)'

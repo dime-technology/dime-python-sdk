@@ -91,3 +91,41 @@ def test_shipping_address_camel_case_key():
     }}}])
     txn = client.transactions.show('000010', {'transaction_info_id': 1})
     assert txn.shipping_address.addr1 == '456 Oak Ave'
+
+
+def test_authorize_sends_envelope_and_maps_transaction():
+    client, mock = fake_client([{'status': 200, 'body': {'data': TXN_BODY | {
+        'transaction_status': 'Pending',
+        'transaction_number': '1234567890',
+        'pending': True,
+    }}}])
+    txn = client.transactions.authorize('000010', {'amount': '100.50', 'token': 'tok_abc'})
+    assert txn.transaction_number == '1234567890'
+    assert txn.pending is True
+    assert sent_body(mock) == {'data': {'sid': '000010', 'amount': '100.50', 'token': 'tok_abc'}}
+    assert mock.request.call_args.args[0] == 'POST'
+    assert mock.request.call_args.args[1].endswith('transaction/authorize')
+
+
+def test_capture_full_amount_omits_amount():
+    client, mock = fake_client([{'status': 200, 'body': {'data': {'message': 'Transaction captured successfully.'}}}])
+    result = client.transactions.capture('000010', '1234567890')
+    assert result.message == 'Transaction captured successfully.'
+    assert sent_body(mock) == {'data': {'sid': '000010', 'transaction_id': '1234567890'}}
+    assert mock.request.call_args.args[0] == 'POST'
+    assert mock.request.call_args.args[1].endswith('transaction/capture')
+
+
+def test_capture_partial_amount():
+    client, mock = fake_client([{'status': 200, 'body': {'data': {'message': 'Transaction captured successfully.'}}}])
+    client.transactions.capture('000010', 1234567890, '50.00')
+    assert sent_body(mock) == {'data': {'sid': '000010', 'transaction_id': 1234567890, 'amount': '50.00'}}
+
+
+def test_capture_refusal_surfaces_api_message():
+    from dime_payments import ValidationException
+
+    client, _ = fake_client([{'status': 400, 'body': {'data': {'message': 'Transaction is not an open authorization.'}}}])
+    with pytest.raises(ValidationException) as exc_info:
+        client.transactions.capture('000010', '1234567890')
+    assert str(exc_info.value) == 'Transaction is not an open authorization.'

@@ -33,6 +33,37 @@ class Transactions(AbstractResource):
         raw = self._transport.request('POST', 'transaction/charge-ach', body)
         return Transaction.from_dict(raw.get('data') or {})
 
+    def authorize(self, sid: str, attributes: dict[str, Any] | None = None) -> Transaction:
+        """
+        Place a hold on a card without moving any money. ``amount`` is required;
+        supply the card as a ``token`` or as raw ``card_number`` /
+        ``expiration_date`` / ``cardholder_name`` / ``billing_address.zip``
+        (raw card data requires PCI compliance).
+
+        Collect with :meth:`capture`, or release the hold with :meth:`void`
+        (``transaction_type`` ``CC``), passing the returned
+        ``transaction_number`` in either case.
+        """
+        body = self._envelope({'sid': sid} | (attributes or {}))
+        raw = self._transport.request('POST', 'transaction/authorize', body)
+        return Transaction.from_dict(raw.get('data') or {})
+
+    def capture(self, sid: str, transaction_id: int | str, amount: str | float | None = None) -> MessageResult:
+        """
+        Collect an authorization. ``transaction_id`` is the ``transaction_number``
+        :meth:`authorize` returned. Omit ``amount`` to capture the full hold.
+
+        An authorization can be captured once: a partial capture settles that
+        amount and releases the rest back to the cardholder.
+        """
+        body = self._envelope({
+            'sid': sid,
+            'transaction_id': transaction_id,
+            'amount': amount,
+        })
+        raw = self._transport.request('POST', 'transaction/capture', body)
+        return MessageResult.from_dict(raw.get('data') or raw)
+
     def tokenize_card(self, sid: str, attributes: dict[str, Any] | None = None) -> TokenizeResult:
         body = self._envelope({'sid': sid} | (attributes or {}))
         raw = self._transport.request('POST', 'transaction/tokenize-card', body)
