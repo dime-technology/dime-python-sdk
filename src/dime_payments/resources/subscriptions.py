@@ -19,8 +19,8 @@ class Subscriptions(AbstractResource):
         List subscriptions, newest first.
 
         ``filters`` takes ``status`` (``Active``, ``Failed``, ``Paused``,
-        ``Cancelled`` or ``Ended``) and ``customer_uuid``. Raises
-        :class:`NotFoundException` when there are none.
+        ``Cancelled`` or ``Ended``) and ``customer_uuid``. A merchant with no
+        subscriptions returns an empty page, not an error.
         """
         body = self._envelope({'sid': sid}, filters or {})
         return self._paginate('GET', 'subscription/list', body, Subscription.from_dict)

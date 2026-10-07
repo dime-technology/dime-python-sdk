@@ -481,8 +481,10 @@ except DimeException as e:
 | `ConnectionException`        | No HTTP response (DNS, timeout, network error)               |
 | `ApiException`               | Any other non-2xx                                            |
 
-The exception message is the API's own where it sends one. Some list endpoints answer `404` when
-nothing matches: an empty chargeback, document or subscription list raises `NotFoundException`.
+The exception message is the API's own where it sends one. The chargeback, document and
+subscription lists return an empty page when nothing matches rather than raising; the older
+endpoints still answer `404` in that case — `transactions`, `deposits`, `recurring_payments` and
+`addresses`.
 
 ## Notes
 

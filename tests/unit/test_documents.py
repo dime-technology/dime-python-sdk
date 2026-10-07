@@ -1,7 +1,6 @@
 import io
 
 import pytest
-from dime_payments import NotFoundException
 from tests.helpers import fake_client, sent_body
 
 UPLOAD_BODY = {
@@ -114,10 +113,9 @@ def test_list_splits_sent_to_processor_pair():
     assert document.processor_status == '00'
 
 
-def test_list_raises_not_found_when_empty():
-    client, _ = fake_client([{'status': 404, 'body': {'data': {'message': 'No documents found'}}}])
-    with pytest.raises(NotFoundException):
-        client.documents.list('000010')
+def test_list_returns_empty_list_when_none():
+    client, _ = fake_client([{'status': 200, 'body': {'data': []}}])
+    assert client.documents.list('000010') == []
 
 
 def test_upload_wire_format_is_multipart_on_a_real_session(monkeypatch):

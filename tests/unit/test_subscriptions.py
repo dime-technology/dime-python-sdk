@@ -39,6 +39,23 @@ def test_list_returns_cursor_page():
     assert mock.request.call_args.args[1].endswith('subscription/list')
 
 
+def test_list_returns_empty_page_when_none():
+    client, _ = fake_client([
+        {
+            'status': 200,
+            'body': {
+                'data': [],
+                'links': {'prev': None, 'next': None},
+                'meta': {'per_page': 500, 'next_cursor': None, 'prev_cursor': None},
+            },
+        }
+    ])
+    page = client.subscriptions.list('000010', {'status': 'Paused'})
+    assert page.data == []
+    assert len(page) == 0
+    assert page.has_more() is False
+
+
 def test_list_sends_filters():
     client, mock = fake_client([{'status': 200, 'body': {'data': [SUB_BODY], 'meta': {}}}])
     client.subscriptions.list('000010', {'status': 'Active', 'customer_uuid': 'cust-uuid-1'})

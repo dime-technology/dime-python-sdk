@@ -58,7 +58,7 @@ class Documents(AbstractResource):
         List the documents held for a merchant, however they arrived.
 
         ``filters`` takes ``doc_type`` and ``chargeback_transaction_info_id``.
-        Raises :class:`NotFoundException` when there are none.
+        A merchant with no documents returns an empty list, not an error.
         """
         body = self._envelope({'sid': sid}, filters or {})
         raw = self._transport.request('GET', 'document/list', body)

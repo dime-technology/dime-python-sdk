@@ -22,8 +22,8 @@ class Chargebacks(AbstractResource):
         List a merchant's chargebacks, oldest first.
 
         ``filters`` takes ``start_date`` and ``end_date`` together (UTC,
-        ``YYYY-mm-dd HH:MM:SS``) and ``representment_status``. Raises
-        :class:`NotFoundException` when there are none.
+        ``YYYY-mm-dd HH:MM:SS``) and ``representment_status``. A merchant with
+        no chargebacks returns an empty page, not an error.
         """
         body = self._envelope({'sid': sid}, filters or {})
         return self._paginate('GET', 'chargeback/list', body, Chargeback.from_dict)

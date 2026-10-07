@@ -1,5 +1,4 @@
 import pytest
-from dime_payments import NotFoundException
 from tests.helpers import fake_client, sent_body
 
 CHARGEBACK_BODY = {
@@ -64,11 +63,22 @@ def test_list_next_page_resends_body_with_cursor():
     assert mock.request.call_args.kwargs['params'] == {'cursor': 'abc'}
 
 
-def test_list_raises_not_found_when_empty():
-    client, _ = fake_client([{'status': 404, 'body': {'data': {'message': 'No chargebacks found'}}}])
-    with pytest.raises(NotFoundException) as exc_info:
-        client.chargebacks.list('000010')
-    assert str(exc_info.value) == 'No chargebacks found'
+def test_list_returns_empty_page_when_none():
+    client, _ = fake_client([
+        {
+            'status': 200,
+            'body': {
+                'data': [],
+                'links': {'prev': None, 'next': None},
+                'meta': {'per_page': 500, 'next_cursor': None, 'prev_cursor': None},
+            },
+        }
+    ])
+    page = client.chargebacks.list('000010')
+    assert page.data == []
+    assert len(page) == 0
+    assert page.has_more() is False
+    assert list(page.auto_paging()) == []
 
 
 def test_show_sends_transaction_info_id():
