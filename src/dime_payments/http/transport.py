@@ -11,7 +11,7 @@ from .error_handler import ErrorHandler
 if TYPE_CHECKING:
     from ..config import Config
 
-SDK_VERSION = '1.4.0'
+SDK_VERSION = '1.4.1'
 
 
 class Transport:
