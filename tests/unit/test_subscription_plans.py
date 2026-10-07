@@ -8,14 +8,14 @@ PLAN_BODY = {
     'description': None,
     'recurrence_schedule': 'Monthly',
     'status': 'active',
-    'subtotal': 20,
-    'total': 20,
+    'subtotal': '20.00',
+    'total': '20.00',
     'token': 'aBQcMJFZVKtsYNC1CWfxca2tvwB1Ls52yMuzT7JI',
     'public_url': 'https://app.dimepayments.com/subscribe/aBQcMJFZVKtsYNC1CWfxca2tvwB1Ls52yMuzT7JI',
     'allow_public': True,
     'created_at': '2026-07-22T13:16:46-04:00',
     'items': [
-        {'name': 'General', 'description': None, 'quantity': 2, 'unit_price': 10},
+        {'name': 'General', 'description': None, 'quantity': 2, 'unit_price': '10.0000'},
     ],
 }
 
@@ -29,7 +29,7 @@ def test_list_returns_cursor_page():
     page = client.subscription_plans.list('000010')
     assert page.data[0].name == 'Monthly Membership'
     assert page.data[0].allow_public is True
-    assert page.data[0].items[0].unit_price == '10'
+    assert page.data[0].items[0].unit_price == '10.0000'
     assert page.data[0].items[0].amount is None
     assert mock.request.call_args.args[1].endswith('subscription-plan/list')
 
@@ -44,7 +44,7 @@ def test_show_maps_response():
     client, mock = fake_client([plan_response()])
     plan = client.subscription_plans.show('000010', 1)
     assert plan.id == 1
-    assert plan.total == '20'
+    assert plan.total == '20.00'
     assert sent_body(mock) == {'data': {'sid': '000010', 'subscription_plan_id': 1}}
     assert mock.request.call_args.args[0] == 'GET'
 
@@ -114,12 +114,12 @@ def test_subscribe_returns_subscribe_result():
         'status': 'Active',
         'next_run_date': '2026-08-21',
         'transaction_number': 'TXN-123',
-        'amount': 25,
+        'amount': '25.00',
     }}}])
     result = client.subscription_plans.subscribe('000010', 42, 'cust-uuid-1', 88)
     assert result.subscription_id == 10
     assert result.transaction_number == 'TXN-123'
-    assert result.amount == '25'
+    assert result.amount == '25.00'
     assert sent_body(mock) == {'data': {
         'sid': '000010',
         'subscription_plan_id': 42,
