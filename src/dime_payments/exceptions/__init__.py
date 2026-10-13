@@ -1,5 +1,6 @@
 from .api_exception import ApiException
 from .authentication_exception import AuthenticationException
+from .capture_exception import CaptureException
 from .connection_exception import ConnectionException
 from .dime_exception import DimeException
 from .idempotency_exception import IdempotencyException
@@ -19,5 +20,6 @@ __all__ = [
     'ServerException',
     'ApiException',
     'IdempotencyException',
+    'CaptureException',
     'ConnectionException',
 ]

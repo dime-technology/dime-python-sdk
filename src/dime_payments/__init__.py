@@ -3,6 +3,7 @@ from .config import Config
 from .exceptions import (
     ApiException,
     AuthenticationException,
+    CaptureException,
     ConnectionException,
     DimeException,
     IdempotencyException,
@@ -27,5 +28,6 @@ __all__ = [
     'ServerException',
     'ApiException',
     'IdempotencyException',
+    'CaptureException',
     'ConnectionException',
 ]

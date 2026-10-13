@@ -18,6 +18,7 @@ from .invoice_link import InvoiceLink
 from .invoice_payment import InvoicePayment
 from .line_item import LineItem
 from .merchant import Merchant
+from .capture_result import CaptureResult
 from .message_result import MessageResult
 from .payment_method import PaymentMethod
 from .recurring_invoice import RecurringInvoice, RecurringInvoiceRun
@@ -48,6 +49,7 @@ __all__ = [
     'RecurringPaymentMethod',
     'TokenizeResult',
     'MessageResult',
+    'CaptureResult',
     'FormLink',
     'Invoice',
     'InvoiceCustomer',
