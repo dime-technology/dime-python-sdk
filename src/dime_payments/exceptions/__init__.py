@@ -2,6 +2,7 @@ from .api_exception import ApiException
 from .authentication_exception import AuthenticationException
 from .connection_exception import ConnectionException
 from .dime_exception import DimeException
+from .idempotency_exception import IdempotencyException
 from .not_found_exception import NotFoundException
 from .permission_denied_exception import PermissionDeniedException
 from .rate_limit_exception import RateLimitException
@@ -17,5 +18,6 @@ __all__ = [
     'RateLimitException',
     'ServerException',
     'ApiException',
+    'IdempotencyException',
     'ConnectionException',
 ]

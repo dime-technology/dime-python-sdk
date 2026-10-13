@@ -5,6 +5,7 @@ from .exceptions import (
     AuthenticationException,
     ConnectionException,
     DimeException,
+    IdempotencyException,
     NotFoundException,
     PermissionDeniedException,
     RateLimitException,
@@ -25,5 +26,6 @@ __all__ = [
     'RateLimitException',
     'ServerException',
     'ApiException',
+    'IdempotencyException',
     'ConnectionException',
 ]

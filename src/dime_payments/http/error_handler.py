@@ -3,6 +3,7 @@ from typing import Any
 from ..exceptions import (
     ApiException,
     AuthenticationException,
+    IdempotencyException,
     NotFoundException,
     PermissionDeniedException,
     RateLimitException,
@@ -24,6 +25,13 @@ class ErrorHandler:
                 body = {}
         except Exception:
             body = {}
+
+        if status in (409, 422):
+            # Only the Idempotency-Key refusals; other 409s (a duplicate
+            # merchant) and 422s keep their usual mapping.
+            msg = ErrorHandler._message(body)
+            if msg is not None and 'Idempotency-Key' in msg:
+                raise IdempotencyException(msg, status_code=status, response_body=body)
 
         if status in (400, 422):
             errors = body.get('errors')
