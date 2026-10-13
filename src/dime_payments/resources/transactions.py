@@ -3,9 +3,11 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from ..data_objects.capture_result import CaptureResult
 from ..data_objects.message_result import MessageResult
 from ..data_objects.tokenize_result import TokenizeResult
 from ..data_objects.transaction import Transaction
+from ..exceptions import CaptureException, DimeException
 from ..pagination.cursor_page import CursorPage
 from .abstract_resource import AbstractResource
 
@@ -97,23 +99,33 @@ class Transactions(AbstractResource):
         amount: str | float | None = None,
         *,
         idempotency_key: str | None = None,
-    ) -> MessageResult:
+    ) -> CaptureResult:
         """
         Collect an authorization. ``transaction_id`` is the ``transaction_number``
         :meth:`authorize` returned. Omit ``amount`` to capture the full hold.
 
         An authorization can be captured once: a partial capture settles that
         amount and releases the rest back to the cardholder.
+
+        Returns what was captured. A refused capture raises
+        :class:`CaptureException`, whose ``error_code`` says why
+        (``already_captured``, ``voided``, ``processor_declined``, ...).
         """
         body = self._envelope({
             'sid': sid,
             'transaction_id': transaction_id,
             'amount': amount,
         })
-        raw = self._transport.request(
-            'POST', 'transaction/capture', body, headers=self._idempotency_headers(idempotency_key),
-        )
-        return MessageResult.from_dict(raw.get('data') or raw)
+        try:
+            raw = self._transport.request(
+                'POST', 'transaction/capture', body, headers=self._idempotency_headers(idempotency_key),
+            )
+        except DimeException as e:
+            capture_error = _capture_exception(e)
+            if capture_error is None:
+                raise
+            raise capture_error from e
+        return CaptureResult.from_dict(raw.get('data') or raw)
 
     def tokenize_card(self, sid: str, attributes: dict[str, Any] | None = None) -> TokenizeResult:
         body = self._envelope({'sid': sid} | (attributes or {}))
@@ -157,3 +169,24 @@ class Transactions(AbstractResource):
         request carries the same one.
         """
         return {'Idempotency-Key': idempotency_key if idempotency_key is not None else str(uuid.uuid4())}
+
+
+def _capture_exception(error: DimeException) -> CaptureException | None:
+    """
+    A refused capture carries ``data.code`` beside its message; anything without
+    one (field validation, an older API, an idempotency refusal) stays the
+    exception it was.
+    """
+    if error.status_code != 400 or isinstance(error.response_body.get('errors'), dict):
+        return None
+    data = error.response_body.get('data')
+    if not isinstance(data, dict) or not isinstance(data.get('code'), str):
+        return None
+    reason = data.get('reason')
+    return CaptureException(
+        str(error),
+        error_code=data['code'],
+        reason=reason if isinstance(reason, str) else None,
+        status_code=error.status_code,
+        response_body=error.response_body,
+    )

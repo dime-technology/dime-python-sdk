@@ -122,10 +122,106 @@ def test_capture_partial_amount():
     assert sent_body(mock) == {'data': {'sid': '000010', 'transaction_id': 1234567890, 'amount': '50.00'}}
 
 
-def test_capture_refusal_surfaces_api_message():
-    from dime_payments import ValidationException
+def test_capture_says_what_it_took():
+    from dime_payments.data_objects import CaptureResult, MessageResult
 
+    client, _ = fake_client([{'status': 200, 'body': {'data': {
+        'message': 'Transaction captured successfully.',
+        'transaction_id': '1234567890',
+        'authorized_amount': '120.00',
+        'captured_amount': '50.00',
+        'status': 'captured',
+        'captured_at': '2026-10-13T15:02:11-04:00',
+    }}}])
+    result = client.transactions.capture('000010', '1234567890', '50.00')
+    assert isinstance(result, CaptureResult)
+    assert isinstance(result, MessageResult)
+    assert result.message == 'Transaction captured successfully.'
+    assert result.transaction_id == '1234567890'
+    assert result.authorized_amount == '120.00'
+    assert result.captured_amount == '50.00'
+    assert result.status == 'captured'
+    assert result.captured_at == '2026-10-13T15:02:11-04:00'
+
+
+def test_capture_fields_are_none_against_an_api_that_only_sends_a_message():
+    client, _ = fake_client([{'status': 200, 'body': {'data': {'message': 'Transaction captured successfully.'}}}])
+    result = client.transactions.capture('000010', '1234567890')
+    assert result.message == 'Transaction captured successfully.'
+    assert result.captured_amount is None
+    assert result.status is None
+
+
+@pytest.mark.parametrize(('code', 'message'), [
+    ('not_found', 'No transaction found.'),
+    ('already_captured', 'Transaction is not an open authorization.'),
+    ('voided', 'Transaction is not an open authorization.'),
+    ('refunded', 'Transaction is not an open authorization.'),
+    ('authorization_declined', 'Transaction is not an open authorization.'),
+    ('not_an_authorization', 'Transaction is not an open authorization.'),
+    ('amount_exceeds_authorization', 'Amount cannot be greater than the authorized amount'),
+    ('some_future_code', 'Something new.'),
+])
+def test_refused_capture_raises_capture_exception_with_its_code(code, message):
+    from dime_payments import ApiException, CaptureException, ValidationException
+
+    client, _ = fake_client([{'status': 400, 'body': {'data': {'message': message, 'code': code}}}])
+    with pytest.raises(CaptureException) as exc_info:
+        client.transactions.capture('000010', '1234567890')
+    error = exc_info.value
+    assert isinstance(error, ApiException)
+    assert isinstance(error, ValidationException)  # what a refusal raised before 1.6.0
+    assert error.error_code == code
+    assert error.get_error_code() == code
+    assert str(error) == message
+    assert error.reason is None
+    assert error.status_code == 400
+
+
+def test_declined_capture_carries_the_reason():
+    from dime_payments import CaptureException
+
+    client, _ = fake_client([{'status': 400, 'body': {'data': {
+        'message': 'Error processing capture',
+        'code': 'processor_declined',
+        'reason': 'Transaction rejected because the authorization has expired.',
+    }}}])
+    with pytest.raises(CaptureException) as exc_info:
+        client.transactions.capture('000010', '1234567890', '50.00')
+    assert exc_info.value.error_code == 'processor_declined'
+    assert exc_info.value.reason == 'Transaction rejected because the authorization has expired.'
+    assert exc_info.value.get_reason() == 'Transaction rejected because the authorization has expired.'
+
+
+def test_capture_validation_error_stays_a_validation_exception():
+    from dime_payments import CaptureException, ValidationException
+
+    client, _ = fake_client([{'status': 400, 'body': {
+        'errors': {'data.transaction_id': ['The data.transaction_id field is required.']},
+    }}])
+    with pytest.raises(ValidationException) as exc_info:
+        client.transactions.capture('000010', '')
+    assert not isinstance(exc_info.value, CaptureException)
+    assert exc_info.value.first_error() == 'The data.transaction_id field is required.'
+
+
+def test_idempotency_refusal_on_capture_stays_an_idempotency_exception():
+    from dime_payments import CaptureException, IdempotencyException
+
+    client, _ = fake_client([{'status': 422, 'body': {'data': {
+        'message': 'This Idempotency-Key was already used for a different request. Use a new key for each new request.',
+    }}}])
+    with pytest.raises(IdempotencyException) as exc_info:
+        client.transactions.capture('000010', '1234567890', idempotency_key='k-1')
+    assert not isinstance(exc_info.value, CaptureException)
+
+
+def test_capture_refusal_surfaces_api_message():
+    from dime_payments import CaptureException, ValidationException
+
+    # An API that predates data.code: the refusal keeps its old exception type.
     client, _ = fake_client([{'status': 400, 'body': {'data': {'message': 'Transaction is not an open authorization.'}}}])
     with pytest.raises(ValidationException) as exc_info:
         client.transactions.capture('000010', '1234567890')
     assert str(exc_info.value) == 'Transaction is not an open authorization.'
+    assert not isinstance(exc_info.value, CaptureException)

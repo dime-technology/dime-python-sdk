@@ -145,6 +145,41 @@ dime.transactions.capture('000010', auth.transaction_number, '80.00')
 dime.transactions.void('000010', 'CC', auth.transaction_number)
 ```
 
+`capture()` returns a `CaptureResult` (v1.6.0+) that says what was taken. It is a `MessageResult`,
+so `message` still works. Amounts are two-decimal strings.
+
+```python
+from dime_payments import CaptureException
+
+try:
+    capture = dime.transactions.capture('000010', auth.transaction_number, '80.00')
+    capture.authorized_amount  # "100.00"
+    capture.captured_amount    # "80.00"
+    capture.status             # "captured"
+    capture.captured_at        # "2026-10-13T15:02:11-04:00"
+except CaptureException as e:
+    e.error_code  # "already_captured", "voided", "processor_declined", ...
+    e.reason      # on processor_declined only: why it was refused
+```
+
+A refused capture raises `CaptureException`. Several refusals share one message, so branch on
+`error_code`:
+
+| `error_code`                   | Meaning                                                            |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `not_found`                    | No transaction with that number for this merchant                  |
+| `already_captured`             | The money was already taken, by an earlier capture or a sale       |
+| `voided`                       | The authorization was voided                                       |
+| `refunded`                     | The transaction was refunded                                       |
+| `authorization_declined`       | The authorization itself was declined, so nothing was held         |
+| `not_an_authorization`         | Not an open card authorization (an ACH payment, for example)       |
+| `amount_exceeds_authorization` | The amount is more than the hold                                   |
+| `processor_declined`           | Refused when sent; `reason` says why. An expired hold ends up here |
+
+A code the SDK doesn't list yet is passed through as given. `CaptureException` is both an
+`ApiException` and a `ValidationException`, which is what a refused capture raised before 1.6.0, so
+existing handlers still catch it. Field validation errors still raise a plain `ValidationException`.
+
 #### Idempotency keys
 
 `charge_card`, `charge_card_token`, `charge_ach`, `authorize`, `capture`, `refund` and `void` send
@@ -509,6 +544,7 @@ except DimeException as e:
 | `RateLimitException`         | HTTP 429 (carries `Retry-After`)                             |
 | `ServerException`            | HTTP 5xx                                                     |
 | `IdempotencyException`       | HTTP 409/422 refusing an `Idempotency-Key`                   |
+| `CaptureException`           | A refused capture; `error_code` says why                     |
 | `ConnectionException`        | No HTTP response (DNS, timeout, network error)               |
 | `ApiException`               | Any other non-2xx                                            |
 
