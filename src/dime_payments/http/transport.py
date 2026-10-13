@@ -11,7 +11,7 @@ from .error_handler import ErrorHandler
 if TYPE_CHECKING:
     from ..config import Config
 
-SDK_VERSION = '1.4.1'
+SDK_VERSION = '1.5.0'
 
 
 class Transport:
@@ -35,6 +35,7 @@ class Transport:
         body: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
         files: list[tuple[str, tuple[str, bytes, str]]] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """
         Send a request and return the decoded JSON body.
@@ -43,6 +44,9 @@ class Transport:
         ``multipart/form-data``, with ``body`` flattened into bracketed form fields
         (``data[sid]``) and each ``(field, (filename, content, content_type))`` in
         ``files`` attached as a file part.
+
+        ``headers`` are added to this request only, and are sent unchanged on
+        every automatic retry of it.
         """
         url = self._config.base_uri() + path.lstrip('/')
         params = {k: v for k, v in (query or {}).items() if v is not None} or None
@@ -58,6 +62,9 @@ class Transport:
                 'files': files,
                 'headers': {'Content-Type': None},
             }
+
+        if headers:
+            payload['headers'] = payload.get('headers', {}) | headers
 
         attempt = 0
 

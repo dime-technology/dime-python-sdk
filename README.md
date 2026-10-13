@@ -57,7 +57,9 @@ dime = Client(Config(
 
 The SDK sends `Authorization: Bearer <token>` and JSON headers on every request. Transient
 failures (HTTP 429 and 5xx, network errors) are retried with exponential backoff, honoring the
-`Retry-After` header when present.
+`Retry-After` header when present. Charges, authorizations, captures, refunds and voids carry an
+`Idempotency-Key`, so a retry of one the API already processed cannot move money twice (see
+[Idempotency keys](#idempotency-keys)).
 
 ## Resources
 
@@ -142,6 +144,34 @@ dime.transactions.capture('000010', auth.transaction_number, '80.00')
 # ...or release the hold instead
 dime.transactions.void('000010', 'CC', auth.transaction_number)
 ```
+
+#### Idempotency keys
+
+`charge_card`, `charge_card_token`, `charge_ach`, `authorize`, `capture`, `refund` and `void` send
+an `Idempotency-Key` header. Without one, a charge that timed out after the API processed it would
+be charged again by the SDK's automatic retry; with one, the API returns the original response
+instead of calling the processor a second time.
+
+If you pass nothing, the SDK generates a new key (a UUID) for each call and reuses it for that
+call's automatic retries. To make your own retries safe too — after a crash, or a
+`ConnectionException` once the SDK's retries run out — pass a key tied to the payment and send the
+same one again:
+
+```python
+txn = dime.transactions.charge_card('000010', {
+    'amount': '100.00',
+    'token': 'tok_abc123',
+}, idempotency_key='order-1001-charge')
+
+dime.transactions.refund('000010', {'amount': '25.00', 'transaction_info_id': 123456},
+                         idempotency_key='order-1001-refund-1')
+```
+
+Keys are 1–255 printable ASCII characters, scoped to your API account, and kept for 7 days. Use a
+new key for each new payment. A refused key raises `IdempotencyException`: HTTP 422 when the key was
+already used for a different request, HTTP 409 when a request with the key is still in progress or
+did not finish (try again shortly; if it persists, check the transaction list before retrying with
+a new key).
 
 ### Merchant onboarding
 
@@ -478,6 +508,7 @@ except DimeException as e:
 | `NotFoundException`          | HTTP 404                                                     |
 | `RateLimitException`         | HTTP 429 (carries `Retry-After`)                             |
 | `ServerException`            | HTTP 5xx                                                     |
+| `IdempotencyException`       | HTTP 409/422 refusing an `Idempotency-Key`                   |
 | `ConnectionException`        | No HTTP response (DNS, timeout, network error)               |
 | `ApiException`               | Any other non-2xx                                            |
 
