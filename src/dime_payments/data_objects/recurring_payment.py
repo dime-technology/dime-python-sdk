@@ -2,12 +2,19 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..support.arr import arr_int, arr_object_from, arr_string
+from .recurring_payment_item import RecurringPaymentItem
 from .recurring_payment_method import RecurringPaymentMethod
 from .transaction_address import TransactionAddress
 
 
 @dataclass
 class RecurringPayment:
+    """
+    A recurring payment schedule. ``item`` is ``None`` when the payment is
+    unpinned: each run is then credited to whatever the merchant's default
+    item is at the time.
+    """
+
     id: int | None = None
     name: str | None = None
     amount: str | None = None
@@ -25,6 +32,8 @@ class RecurringPayment:
     error: str | None = None
     payment_method: RecurringPaymentMethod = field(default_factory=RecurringPaymentMethod)
     shipping_address: TransactionAddress = field(default_factory=TransactionAddress)
+    cover_processing_amount: str | None = None
+    item: RecurringPaymentItem | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> 'RecurringPayment':
@@ -49,5 +58,11 @@ class RecurringPayment:
             ),
             shipping_address=TransactionAddress.from_dict(
                 arr_object_from(data, ['shipping_address'])
+            ),
+            cover_processing_amount=arr_string(data, 'cover_processing_amount'),
+            item=(
+                RecurringPaymentItem.from_dict(data['item'])
+                if isinstance(data.get('item'), dict)
+                else None
             ),
         )

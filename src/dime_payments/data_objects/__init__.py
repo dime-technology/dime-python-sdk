@@ -23,6 +23,7 @@ from .message_result import MessageResult
 from .payment_method import PaymentMethod
 from .recurring_invoice import RecurringInvoice, RecurringInvoiceRun
 from .recurring_payment import RecurringPayment
+from .recurring_payment_item import RecurringPaymentItem
 from .recurring_payment_method import RecurringPaymentMethod
 from .releasable_transactions import ReleasableTransaction, ReleasableTransactions
 from .subscribe_result import SubscribeResult
@@ -46,6 +47,7 @@ __all__ = [
     'DepositGroup',
     'DepositWithTransactions',
     'RecurringPayment',
+    'RecurringPaymentItem',
     'RecurringPaymentMethod',
     'TokenizeResult',
     'MessageResult',
