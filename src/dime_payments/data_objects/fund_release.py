@@ -13,6 +13,15 @@ class FundRelease:
     ``unknown`` (no confirmation came back, so it may have gone through — its
     amount stays held back from ``releasable`` until it is reconciled).
     ``transaction_info_ids`` is empty when the release was requested by amount.
+
+    ``returned`` is what a ``released`` release becomes days later when the
+    merchant's own bank rejects the transfer and the money comes back.
+    ``completed_at`` still says when it was sent; ``returned_at`` says when the
+    bank rejected it, ``return_code`` gives the bank's reason (R02 account
+    closed, R03 no account, R04 invalid account number), and ``return_fee`` what
+    the return cost. ``fee`` keeps what the transfer was quoted at.
+    ``return_fee`` can be None on a returned release until the return fee has
+    been reported.
     """
 
     id: int | None = None
@@ -25,6 +34,9 @@ class FundRelease:
     failure_reason: str | None = None
     requested_at: str | None = None
     completed_at: str | None = None
+    returned_at: str | None = None
+    return_code: str | None = None
+    return_fee: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> 'FundRelease':
@@ -39,6 +51,9 @@ class FundRelease:
             failure_reason=arr_string(data, 'failure_reason'),
             requested_at=arr_string(data, 'requested_at'),
             completed_at=arr_string(data, 'completed_at'),
+            returned_at=arr_string(data, 'returned_at'),
+            return_code=arr_string(data, 'return_code'),
+            return_fee=arr_string(data, 'return_fee'),
         )
 
 

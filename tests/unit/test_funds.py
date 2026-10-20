@@ -31,6 +31,9 @@ RELEASE_BODY = {
         'failure_reason': None,
         'requested_at': '2026-09-25T14:02:11+00:00',
         'completed_at': '2026-09-25T14:02:12+00:00',
+        'returned_at': None,
+        'return_code': None,
+        'return_fee': None,
     },
 }
 
@@ -87,6 +90,9 @@ def test_release_by_amount():
     assert result.release.status == 'released'
     assert result.release.fee == '30'
     assert result.release.transaction_info_ids == []
+    assert result.release.returned_at is None
+    assert result.release.return_code is None
+    assert result.release.return_fee is None
     assert sent_body(mock) == {'data': {
         'sid': '91828382',
         'amount': '1500.00',
@@ -114,6 +120,25 @@ def test_release_unconfirmed_returns_unknown_status():
     result = client.funds.release('91828382', 'payout-3', amount=10)
     assert result.release.status == 'unknown'
     assert result.release.failure_reason == 'No confirmation from the processor.'
+
+
+def test_release_returned_by_the_bank_carries_the_return_fee():
+    release = RELEASE_BODY['release'] | {
+        'status': 'returned',
+        'status_label': 'Returned',
+        'failure_reason': 'The receiving bank rejected the transfer: Account Closed.',
+        'returned_at': '2026-09-29T15:37:13+00:00',
+        'return_code': 'R02',
+        'return_fee': 25,
+    }
+    client, _ = fake_client([{'status': 200, 'body': {'data': RELEASE_BODY | {'replayed': True, 'release': release}}}])
+    result = client.funds.release('91828382', 'payout-2026-09-25-0001', amount=1500)
+    assert result.release.status == 'returned'
+    assert result.release.completed_at == '2026-09-25T14:02:12+00:00'
+    assert result.release.returned_at == '2026-09-29T15:37:13+00:00'
+    assert result.release.return_code == 'R02'
+    assert result.release.return_fee == '25'
+    assert result.release.fee == '30'
 
 
 def test_release_declined_returns_failed_release():

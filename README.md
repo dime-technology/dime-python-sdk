@@ -449,7 +449,7 @@ result = dime.funds.release(
     transaction_info_ids=[t.transaction_info_id for t in payable.transactions],
 )
 
-print(result.release.status)  # released | failed | unknown
+print(result.release.status)  # released | failed | unknown, and later perhaps returned
 ```
 
 Use a fresh `idempotency_key` for every intended release and reuse it when retrying: a repeat
@@ -460,6 +460,13 @@ with status `failed` and a `failure_reason`; nothing moved. A request refused be
 recorded raises: `ValidationException` (422) for more than is releasable or an ineligible payment,
 `ApiException` (409) for a reused key or a release already in flight, and `ServerException` (503)
 when the processor cannot be reached.
+
+A release can also become `returned`, days after it was `released`, when the merchant's own bank
+rejects the transfer and the money comes back. The API reports it on the `funds_release_failed`
+webhook and when you retry with that release's key. `returned_at` says when, `return_code` gives the bank's reason
+(`R02` account closed, `R03` no account, `R04` invalid account number), and `return_fee` what the return
+cost. `fee` stays what the transfer was quoted at. `return_fee` can be empty until the return fee
+has been reported.
 
 ### Subscription plans and subscriptions
 
